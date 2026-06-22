@@ -17,6 +17,11 @@ const PORT = process.env.PORT || 3000;
  * 4. Llama a next().
  */
 // Tu código aquí
+app.use((req, res, next) => {
+  req.db = client.db('MundialDB');
+  req.collection = req.db.collection('equipos');
+  next();
+});
 
 /**
  * TODO: Implementar un endpoint GET /equipos
@@ -26,7 +31,8 @@ const PORT = process.env.PORT || 3000;
  * IMPORTANTE: Recuerda que las consultas a MongoDB son asincrónicas.
  */
 app.get('/equipos', async (req, res) => {
-    // Tu código aquí
+  let equipos = await req.collection.find().toArray();
+  res.status(200).json(equipos);
 });
 
 /**
@@ -38,7 +44,11 @@ app.get('/equipos', async (req, res) => {
  * IMPORTANTE: ¡Esta ruta debe ir ANTES que la ruta GET /equipos/:id!
  */
 app.get('/equipos/buscar', async (req, res) => {
-    // Tu código aquí
+  let tecnico = req.query.tecnico;
+  let equipos = await req.collection.find({
+    tecnico: { $regex: tecnico, $options: 'i' }
+  }).toArray();
+  res.status(200).json(equipos);
 });
 
 /**
@@ -51,19 +61,28 @@ app.get('/equipos/buscar', async (req, res) => {
  * 5. Si no lo encuentra, retornar un status 404 y { error: "Equipo no encontrado" }.
  */
 app.get('/equipos/:id', async (req, res) => {
-    // Tu código aquí
+  let id = req.params.id;
+  if (!ObjectId.isValid(id)) {
+    res.status(400).json({ error: 'ID inválido' });
+    return;
+  }
+  let equipo = await req.collection.findOne({ _id: new ObjectId(id) });
+  if (equipo) {
+    res.status(200).json(equipo);
+  } else {
+    res.status(404).json({ error: 'Equipo no encontrado' });
+  }
 });
 
 
 
 // Iniciar el servidor solo si este archivo se ejecuta directamente
 if (require.main === module) {
-    connectDB().then(() => {
-        app.listen(PORT, () => {
-            console.log(`Servidor escuchando en http://localhost:${PORT}`);
-        });
+  connectDB().then(() => {
+    app.listen(PORT, () => {
+      console.log(`Servidor escuchando en http://localhost:${PORT}`);
     });
+  });
 }
-
 // Exportamos 'app', 'closeDB', 'client' y 'connectDB' para poder hacer testing
 module.exports = { app, closeDB, client, connectDB };
